@@ -4,11 +4,12 @@ const EventEmitter = require('events').EventEmitter
 const webpack = require('webpack')
 const readline = require('readline')
 const escape = require('escape-html')
-
+const HtmlWebpackPlugin = require('vuepress-html-webpack-plugin')
+const merge = require('webpack-merge')
 const { chalk, fs, path, logger, env, performance } = require('@vuepress/shared-utils')
 const createClientConfig = require('../webpack/createClientConfig')
 const createServerConfig = require('../webpack/createServerConfig')
-const { createBundleRenderer } = require('vue-server-renderer')
+// const { createBundleRenderer } = require('vue-server-renderer')
 const { normalizeHeadTag, applyUserWebpackConfig } = require('../util/index')
 const { version } = require('../../../package')
 
@@ -51,12 +52,27 @@ module.exports = class Build extends EventEmitter {
 
   async render () {
     // compile!
-    const stats = await compile([this.clientConfig, this.serverConfig])
-    const serverBundle = require(path.resolve(this.outDir, 'manifest/server.json'))
-    const clientManifest = require(path.resolve(this.outDir, 'manifest/client.json'))
+    // const context = {
+    //   url: page.path,
+    //   userHeadTags: this.userHeadTags,
+    //   title: 'VuePress',
+    //   lang: 'en',
+    //   description: '',
+    //   version
+    // }
+
+    const stats = await compile([merge(this.clientConfig, {
+      plugins: [
+        new HtmlWebpackPlugin({
+          template: this.context.devTemplate
+        })
+      ]
+    })])
+    // const serverBundle = require(path.resolve(this.outDir, 'manifest/server.json'))
+    // const clientManifest = require(path.resolve(this.outDir, 'manifest/client.json'))
 
     // remove manifests after loading them.
-    await fs.remove(path.resolve(this.outDir, 'manifest'))
+    // await fs.remove(path.resolve(this.outDir, 'manifest'))
 
     // ref: https://github.com/vuejs/vuepress/issues/1367
     if (!this.clientConfig.devtool && (!this.clientConfig.plugins
@@ -67,14 +83,14 @@ module.exports = class Build extends EventEmitter {
       await workaroundEmptyStyleChunk(stats, this.outDir)
     }
 
-    // create server renderer using built manifests
-    this.renderer = createBundleRenderer(serverBundle, {
-      clientManifest,
-      runInNewContext: false,
-      inject: false,
-      shouldPrefetch: this.context.siteConfig.shouldPrefetch || (() => true),
-      template: await fs.readFile(this.context.ssrTemplate, 'utf-8')
-    })
+    // // create server renderer using built manifests
+    // this.renderer = createBundleRenderer(serverBundle, {
+    //   clientManifest,
+    //   runInNewContext: false,
+    //   inject: false,
+    //   shouldPrefetch: this.context.siteConfig.shouldPrefetch || (() => true),
+    //   template: await fs.readFile(this.context.ssrTemplate, 'utf-8')
+    // })
 
     // pre-render head tags from user config
     // filter out meta tags for they will be injected in updateMeta.js
@@ -91,14 +107,14 @@ module.exports = class Build extends EventEmitter {
     // render pages
     logger.wait('Rendering static HTML...')
 
-    const pagePaths = await Promise.all(
-      this.context.pages.map(page => this.renderPage(page))
-    )
+    // const pagePaths = await Promise.all(
+    //   this.context.pages.map(page => this.renderPage(page))
+    // )
 
     readline.clearLine(process.stdout, 0)
     readline.cursorTo(process.stdout, 0)
 
-    await this.context.pluginAPI.applyAsyncOption('generated', pagePaths)
+    // await this.context.pluginAPI.applyAsyncOption('generated', pagePaths)
 
     // DONE.
     const relativeDir = path.relative(this.context.cwd, this.outDir)
